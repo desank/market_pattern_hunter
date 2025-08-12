@@ -1,0 +1,97 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  scanConfigs ScanConfig[]
+  alerts      Alert[]
+}
+
+model Post {
+  id        String   @id @default(cuid())
+  title     String
+  content   String?
+  published Boolean  @default(false)
+  authorId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ScanConfig {
+  id              String   @id @default(cuid())
+  name            String
+  etfSymbol       String
+  lookbackPeriod  Int      @default(30) // days
+  timeframe       String   @default("1d") // 1d, 1h, 4h, etc.
+  userId          String
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  user            User         @relation(fields: [userId], references: [id])
+  scans           Scan[]
+}
+
+model Scan {
+  id              String   @id @default(cuid())
+  scanConfigId    String
+  etfSymbol       String
+  etfPerformance  Float    // percentage change
+  status          String   @default("pending") // pending, running, completed, failed
+  stocksScanned   Int      @default(0)
+  vcpFound        Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  scanConfig      ScanConfig  @relation(fields: [scanConfigId], references: [id])
+  stockScans      StockScan[]
+}
+
+model StockScan {
+  id            String   @id @default(cuid())
+  scanId        String
+  symbol        String
+  name          String?
+  hasVcpPattern Boolean  @default(false)
+  vcpScore      Float?   // confidence score 0-100
+  entrySignal   Boolean  @default(false)
+  lastPrice     Float?
+  volume        Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  scan          Scan     @relation(fields: [scanId], references: [id])
+  alerts        Alert[]
+}
+
+model Alert {
+  id            String   @id @default(cuid())
+  userId        String
+  stockScanId   String?
+  type          String   // "vcp_found", "entry_signal"
+  symbol        String
+  message       String
+  sent          Boolean  @default(false)
+  sentAt        DateTime?
+  createdAt     DateTime @default(now())
+  
+  user          User        @relation(fields: [userId], references: [id])
+  stockScan     StockScan?  @relation(fields: [stockScanId], references: [id])
+}
