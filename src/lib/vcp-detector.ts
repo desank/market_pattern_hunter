@@ -9,6 +9,7 @@ export interface VCPResult {
   volumeDryUp: boolean
   breakoutPotential: number
   entryPoints: EntryPoint[]
+  targetProjection?: number // New field for target projection
   description: string
 }
 
@@ -52,6 +53,7 @@ export class VCPDetector {
     const volumeAnalysis = this.analyzeVolume(recentData)
     const breakout = this.assessBreakoutPotential(recentData)
     const entryPoints = this.findEntryPoints(recentData)
+    const targetProjection = this.calculateTargetProjection(recentData, bases)
 
     // Calculate overall score
     const score = this.calculateVCPScore({
@@ -74,6 +76,7 @@ export class VCPDetector {
       volumeDryUp: volumeAnalysis.dryUp,
       breakoutPotential: breakout.score,
       entryPoints,
+      targetProjection,
       description: this.generateDescription({
         hasPattern,
         score,
@@ -334,6 +337,23 @@ export class VCPDetector {
     }
 
     return entryPoints.sort((a, b) => b.confidence - a.confidence)
+  }
+
+  /**
+   * Calculate target projection based on VCP pattern
+   */
+  private calculateTargetProjection(data: HistoricalDataPoint[], bases: any[]): number | undefined {
+    if (bases.length === 0) return undefined
+
+    // Use the last base for target projection
+    const lastBase = bases[bases.length - 1]
+    const baseHigh = Math.max(...data.slice(lastBase.start, lastBase.end + 1).map(d => d.high))
+    const baseLow = Math.min(...data.slice(lastBase.start, lastBase.end + 1).map(d => d.low))
+    const baseDepth = baseHigh - baseLow
+
+    // Project the depth of the base upwards from the breakout point (e.g., baseHigh)
+    const target = baseHigh + baseDepth
+    return target
   }
 
   /**

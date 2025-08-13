@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import StockChart from '@/components/stock-chart'
+import { HistoricalDataPoint } from '@/lib/stock-data'
+import { VCPResult } from '@/lib/vcp-detector'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -84,6 +87,10 @@ export default function Home() {
   const [scanningConfigId, setScanningConfigId] = useState<string | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [editingConfig, setEditingConfig] = useState<ScanConfig | null>(null)
+  const [isChartDialogOpen, setIsChartDialogOpen] = useState(false)
+  const [selectedStockScan, setSelectedStockScan] = useState<StockScan | null>(null)
+  const [stockHistoricalData, setStockHistoricalData] = useState<HistoricalDataPoint[]>([])
+  const [selectedStockVcpResult, setSelectedStockVcpResult] = useState<VCPResult | null>(null)
   
   // New scan configuration form state
   const [newConfig, setNewConfig] = useState({
@@ -189,6 +196,28 @@ export default function Home() {
       setLoadingStocksForScan(null)
     }
   }
+
+  const loadStockHistoricalData = async (symbol: string) => {
+    try {
+      const response = await fetch(`/api/stock-data/${symbol}`)
+      if (response.ok) {
+        const data = await response.json()
+        setStockHistoricalData(data.historicalData)
+        setSelectedStockVcpResult(data.vcpResult)
+      } else {
+        toast.error(`Failed to load historical data for ${symbol}`)
+      }
+    } catch (error) {
+      console.error(`Failed to load historical data for ${symbol}:`, error)
+      toast.error(`Failed to load historical data for ${symbol}`)
+    }
+  }
+
+  useEffect(() => {
+    if (selectedStockScan) {
+      loadStockHistoricalData(selectedStockScan.symbol)
+    }
+  }, [selectedStockScan])
 
   const createScanConfig = async () => {
     if (!newConfig.name || !newConfig.etfSymbol) {
@@ -916,7 +945,14 @@ export default function Home() {
                       </TableHeader>
                     <TableBody>
                       {stockScans.map((stock) => (
-                        <TableRow key={stock.id}>
+                        <TableRow 
+                          key={stock.id}
+                          onClick={() => {
+                            setSelectedStockScan(stock)
+                            setIsChartDialogOpen(true)
+                          }}
+                          className="cursor-pointer hover:bg-gray-50"
+                        >
                           <TableCell className="font-medium">{stock.symbol}</TableCell>
                           <TableCell>{stock.name}</TableCell>
                           <TableCell>
@@ -1031,6 +1067,31 @@ export default function Home() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={isChartDialogOpen} onOpenChange={setIsChartDialogOpen}>
+        <DialogContent className="sm:max-w-[800px]">
+          <DialogHeader>
+            <DialogTitle>Stock Chart & Pattern Analysis</DialogTitle>
+            <DialogDescription>
+              Detailed view of the selected stock's historical data and VCP pattern analysis.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {selectedStockScan && stockHistoricalData.length > 0 && selectedStockVcpResult ? (
+              <StockChart 
+                historicalData={stockHistoricalData} 
+                vcpResult={selectedStockVcpResult} 
+                symbol={selectedStockScan.symbol}
+              />
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <BarChart3 className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                <p>Loading chart data...</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
