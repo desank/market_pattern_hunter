@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -80,6 +82,8 @@ export default function Home() {
   const [loadingStocksForScan, setLoadingStocksForScan] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState('dashboard')
   const [scanningConfigId, setScanningConfigId] = useState<string | null>(null)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [editingConfig, setEditingConfig] = useState<ScanConfig | null>(null)
   
   // New scan configuration form state
   const [newConfig, setNewConfig] = useState({
@@ -287,6 +291,64 @@ export default function Home() {
     } catch (error) {
       console.error('Failed to delete all scans:', error)
       toast.error('Failed to delete scans. Please try again.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const deleteScanConfig = async (configId: string) => {
+    if (!confirm('Are you sure you want to delete this scan configuration?')) {
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      const response = await fetch(`/api/scan-configs/${configId}`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        await loadScanConfigs()
+        toast.success('Configuration deleted successfully!')
+      } else {
+        const error = await response.json()
+        toast.error(`Failed to delete configuration: ${error.error || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Failed to delete scan config:', error)
+      toast.error('Failed to delete configuration. Please try again.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const updateScanConfig = async () => {
+    if (!editingConfig || !editingConfig.name || !editingConfig.etfSymbol) {
+      toast.error('Please fill in all required fields for the configuration.')
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      const response = await fetch(`/api/scan-configs/${editingConfig.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(editingConfig)
+      })
+
+      if (response.ok) {
+        await loadScanConfigs()
+        setIsEditDialogOpen(false)
+        toast.success('Configuration updated successfully!')
+      } else {
+        const error = await response.json()
+        toast.error(`Failed to update configuration: ${error.error || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Failed to update scan config:', error)
+      toast.error('Failed to update configuration. Please try again.')
     } finally {
       setIsLoading(false)
     }
@@ -626,6 +688,108 @@ export default function Home() {
                           )}
                           {scanningConfigId === config.id ? 'Starting...' : 'Start Scan'}
                         </Button>
+                        <Dialog open={isEditDialogOpen && editingConfig?.id === config.id} onOpenChange={setIsEditDialogOpen}>
+                          <DialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setEditingConfig(config)
+                                setIsEditDialogOpen(true)
+                              }}
+                            >
+                              Edit
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="sm:max-w-[425px]">
+                            <DialogHeader>
+                              <DialogTitle>Edit Scan Configuration</DialogTitle>
+                              <DialogDescription>
+                                Make changes to your scan configuration here. Click save when you're done.
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="grid gap-4 py-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="edit-name">Configuration Name</Label>
+                                <Input
+                                  id="edit-name"
+                                  value={editingConfig?.name || ''}
+                                  onChange={(e) => setEditingConfig(prev => prev ? { ...prev, name: e.target.value } : null)}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="edit-etfSymbol">ETF Symbol</Label>
+                                <Select
+                                  value={editingConfig?.etfSymbol || ''}
+                                  onValueChange={(value) => setEditingConfig(prev => prev ? { ...prev, etfSymbol: value } : null)}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select ETF" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {popularEtfs.map((etf) => (
+                                      <SelectItem key={etf.symbol} value={etf.symbol}>
+                                        {etf.symbol} - {etf.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="edit-lookbackPeriod">Lookback Period (days)</Label>
+                                <Input
+                                  id="edit-lookbackPeriod"
+                                  type="number"
+                                  value={editingConfig?.lookbackPeriod || 0}
+                                  onChange={(e) => setEditingConfig(prev => prev ? { ...prev, lookbackPeriod: parseInt(e.target.value) || 0 } : null)}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="edit-timeframe">Timeframe</Label>
+                                <Select
+                                  value={editingConfig?.timeframe || ''}
+                                  onValueChange={(value) => setEditingConfig(prev => prev ? { ...prev, timeframe: value } : null)}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="1d">Daily (1d)</SelectItem>
+                                    <SelectItem value="1h">Hourly (1h)</SelectItem>
+                                    <SelectItem value="4h">4-Hour (4h)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                            <DialogFooter>
+                              <Button type="submit" onClick={updateScanConfig} disabled={isLoading}>
+                                {isLoading ? (
+                                  <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> Saving...</>
+                                ) : (
+                                  'Save changes'
+                                )}
+                              </Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="sm">Delete</Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This action cannot be undone. This will permanently delete your scan configuration
+                                and remove its data from our servers.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => deleteScanConfig(config.id)}>Continue</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </div>
                   ))
