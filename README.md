@@ -60,6 +60,12 @@ This scaffold provides a robust foundation built with:
 # Install dependencies
 npm install
 
+# Generate Prisma Client
+npx prisma generate
+
+# Push schema to database
+npx prisma db push
+
 # Start development server
 npm run dev
 

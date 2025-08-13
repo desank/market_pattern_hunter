@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "nodemon --exec \"npx tsx server.ts\" --watch server.ts --watch src --ext ts,tsx,js,jsx 2>&1 | tee dev.log",
+    "dev": "nodemon --exec \"npx tsx server.ts\" --watch server.ts --watch src --ext ts,tsx,js,jsx 2>&1",
     "build": "next build",
     "start": "NODE_ENV=production tsx server.ts 2>&1 | tee server.log",
     "lint": "next lint",
@@ -71,7 +71,7 @@
     "react-hook-form": "^7.60.0",
     "react-markdown": "^10.1.0",
     "react-resizable-panels": "^3.0.3",
-    "react-syntax-highlighter": "^15.6.1",
+    "react-syntax-highlighter": "^5.8.0",
     "recharts": "^2.15.4",
     "sharp": "^0.34.3",
     "socket.io": "^4.8.1",
